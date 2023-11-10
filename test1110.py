@@ -1,5 +1,5 @@
 from sklearn.cluster import DBSCAN
-from math import sqrt, ceil
+from math import sqrt
 from auto_epsilon import auto_epsilon
 from utils import *
 import matplotlib.pyplot as plt
