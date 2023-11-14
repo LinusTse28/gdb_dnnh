@@ -72,56 +72,53 @@ def assign_points_to_cells(data, qx, qy, layers, grid_shape, cell_size):
 
 def visualize_spiral(grid_shape, qx, qy, layers, cell_size, data):
     fig, ax = plt.subplots(figsize=(8, 8))
-    grid = np.zeros(grid_shape)
+    ax.set_xlim([0, grid_shape[1] * cell_size])
+    ax.set_ylim([0, grid_shape[0] * cell_size])
 
+    # 绘制网格线
+    for x in range(grid_shape[1]):
+        ax.axvline(x * cell_size, color='grey', linewidth=0.8)
+    for y in range(grid_shape[0]):
+        ax.axhline(y * cell_size, color='grey', linewidth=0.8)
+
+    # 标记螺旋顺序的格子
+    spiral_order_indices = get_spiral_order_indices(qx, qy, layers, grid_shape, cell_size)
+    print(spiral_order_indices)
+    for idx, (row, col) in enumerate(spiral_order_indices):
+        rect = plt.Rectangle((col * cell_size, (grid_shape[0] - row - 1) * cell_size), cell_size, cell_size,
+                             fill=None, edgecolor='blue', linewidth=1)
+        ax.add_patch(rect)
+        ax.text(col * cell_size + cell_size / 2, (grid_shape[0] - row - 1) * cell_size + cell_size / 2,
+                str(idx + 1), color="blue", ha="center", va="center", fontsize=9)
+
+    # 绘制数据点
     cells_dict = assign_points_to_cells(data, qx, qy, layers, grid_shape, cell_size)
+    for (row, col), points in cells_dict.items():
+        x_values = [p[0] for p in points]
+        y_values = [p[1] for p in points]
+        ax.scatter(x_values, y_values, s=10, c='red')  # 红色点表示数据点
 
-    # 获取螺旋形的单元格
-    spiral_indices = spiral_cells(qx, qy, layers, grid_shape, cell_size)
+    # 标记查询点 q
+    ax.scatter(qx, qy, c='green', s=50, marker='x')  # 绿色x表示查询点
 
-    # 为每个单元格填充颜色
-    for count, (row, col) in enumerate(spiral_indices, 1):
-        ax.add_patch(plt.Rectangle((col * cell_size, row * cell_size), cell_size, cell_size, fill=None, alpha=1,
-                                   edgecolor='blue'))
+    # 关闭matplotlib的默认网格显示，并手动设置坐标轴标签
+    plt.grid(False)
+    plt.xticks(np.arange(0, grid_shape[1] * cell_size, cell_size))
+    plt.yticks(np.arange(0, grid_shape[0] * cell_size, cell_size))
+    ax.set_xticklabels(np.around(np.arange(0, grid_shape[1] * cell_size, cell_size), 2))
+    ax.set_yticklabels(np.around(np.arange(0, grid_shape[0] * cell_size, cell_size), 2))
 
-        # 显示前9个网格的数据点数量
-        if count <= 9:  # 仅检查前9个网格
-            points_in_cell = cells_dict.get((row, col), [])
-            ax.text(col * cell_size + cell_size / 2, row * cell_size + cell_size / 2, f'{len(points_in_cell)}',
-                    va='center', ha='center', size=8)
+    # 翻转y轴以匹配常用的坐标系
+    plt.gca().invert_yaxis()
 
-        # 画出数据点
-        for cell, points in cells_dict.items():
-            y, x = cell
-            x_values = [p[0] for p in points]
-            y_values = [p[1] for p in points]
-            ax.scatter(x_values, y_values, s=0.5, c='black')
-
-    # Create a normalized grid for displaying gray-scale
-    normalized_grid = grid / len(cells)
-
-    plt.imshow(normalized_grid, cmap='gray_r', extent=(0, grid_shape[1] * cell_size, grid_shape[0] * cell_size, 0))
-    for (y, x), grid_value in np.ndenumerate(grid):
-        if grid_value:
-            plt.text(x * cell_size + cell_size / 2, y * cell_size + cell_size / 2,
-                     f"{int(grid_value)}",
-                     ha='center', va='center', color='black', fontsize=6)
-    plt.grid(which='both', linestyle='-', linewidth=0.5, color='gray')
-    # plt.xticks(np.arange(0, grid_shape[1] * cell_size, cell_size))
-    # plt.yticks(np.arange(0, grid_shape[0] * cell_size, cell_size))
-    x_values = data[:, 0]  # 假设第一列是x值
-    y_values = data[:, 1]  # 假设第二列是y值
-    plt.scatter(x_values, y_values, s=0.5)
-    plt.title("Spiral Order")
-
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.scatter(qx, qy, c='red', s=2)
+    # 显示图形
+    plt.xlim(0.1, 0.3)
+    plt.ylim(0.8, 1)
     plt.show()
 
 
 # Example usage
-data = np.array(pd.read_csv('/Users/linus/Desktop/data/RN_50K_50P_1S.csv'))
+data = np.array(pd.read_csv('/Users/linustse/Desktop/data/RN_50K_50P_1S.csv'))
 eps = auto_epsilon(data)
 
 cell_size = eps / sqrt(2)
@@ -134,12 +131,12 @@ grid_shape = (10, 10)  # 100x100 grids
 
 layers = 10  # Number of layers to spiral out'''
 qx, qy = 0.19, 0.92  # Starting point in the data range
-# visualize_spiral(grid_shape, qx, qy, layers, cell_size, data)
+visualize_spiral(grid_shape, qx, qy, layers, cell_size, data)
 
 '''cells = spiral_cells(qx, qy, layers, grid_shape, cell_size)
 print(cells)
 '''
-assigned_cells = assign_points_to_cells(data, qx, qy, layers, grid_shape, cell_size)
+'''assigned_cells = assign_points_to_cells(data, qx, qy, layers, grid_shape, cell_size)
 
 # 打印前9个网格内的数据点
 for idx, (cell_idx, points) in enumerate(assigned_cells.items()):
@@ -148,6 +145,4 @@ for idx, (cell_idx, points) in enumerate(assigned_cells.items()):
         for point in points:
             print(point)
     else:
-        break
-
-visualize_spiral(grid_shape, qx, qy, layers, cell_size, data)
+        break'''

@@ -3,6 +3,16 @@ import pandas as pd
 from sklearn.datasets import make_blobs
 from scipy.spatial import distance
 
+from scipy.spatial import KDTree
+def load_data_from_csv_labeled(file_path):
+    # 加载数据，假设CSV文件的前两列是x和y坐标，第三列是标签
+    df = pd.read_csv(file_path)
+
+    # 分离特征和标签
+    X = df.iloc[:, :2].values  # 前两列是特征
+    y = df.iloc[:, 2].values  # 第三列是标签
+
+    return X, y
 def create_fake_data(n_samples=300,
                      n_features=2, 
                      centers=10,
@@ -45,3 +55,8 @@ def delta_(q, cluster):
 def rmv_idx(cluster):
     return np.array([pt for pt, idx in cluster])
 
+
+def find_nearest_points_kd(data, cluster):
+    data_tree = KDTree(data)
+    nearest_indices = data_tree.query(cluster, k=1)[1]
+    return nearest_indices

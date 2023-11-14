@@ -8,6 +8,16 @@ from sklearn.neighbors import NearestNeighbors
 import numpy as np
 
 
+def load_data_from_csv_labeled(file_path):
+    # 加载数据，假设CSV文件的前两列是x和y坐标，第三列是标签
+    df = pd.read_csv(file_path)
+
+    # 分离特征和标签
+    X = df.iloc[:, :2].values  # 前两列是特征
+    y = df.iloc[:, 2].values  # 第三列是标签
+
+    return X, y
+
 def find_neighbors(p, P, epsilon, visited):
     neighbors = []
     P_array = np.array([pt[0] for pt in P])
@@ -108,7 +118,7 @@ def expand_algorithm(P, q, epsilon, minPts=5):
 
                 if new_bound < bound:
                     # Calculate Delta_old and Delta_new
-                    Delta_new = delta_(q, rmv_idx(P[(labels == clusterId)]))
+                    Delta_new = delta(q, rmv_idx(P[(labels == clusterId)]))
 
                     if len(Ci) >= minPts * density_threshold and Delta_new < Delta_old or clusterId == 0:
                         update = True
@@ -135,7 +145,7 @@ def expand_algorithm(P, q, epsilon, minPts=5):
     # print(clusterId)
     clusters = [[i, P[(labels == i) & mask]] for i in range(clusterId + 1) if len(P[(labels == i) & mask]) > 0]
     # clusters = [[i, P[(labels == i) & mask]] for i in range(clusterId) if len(P[(labels == i) & mask]) > 0]
-    clusters = sorted(clusters, key=lambda c: delta_(q, c[1]))
+    clusters = sorted(clusters, key=lambda c: delta(q, c[1]))
 
     # Return clusters, labels, and bound
     return clusters, labels, bound
@@ -208,8 +218,8 @@ def plot_current_cluster(data, labels, clusterId, q, bound):
 
 
 def run(path, q):
-
-    P = np.array(pd.read_csv(path))
+    P, labels = load_data_from_csv_labeled(data_path)
+    #P = np.array(pd.read_csv(path))
     P = np.array(sorted(P, key=lambda p: np.linalg.norm(p - q)))
     #P = np.array([[p, idx] for idx, p in enumerate(P_sorted)], dtype=object)
 
@@ -218,35 +228,70 @@ def run(path, q):
     startTime = time.time()
     clusters, labels, bound = expand_algorithm(P, q, epsilon=eps)
     #print('processing time is ', time.time() - startTime)
-    print(time.time() - startTime)
+    #print(time.time() - startTime)
     plot_clusters(P, clusters, labels, q, bound, path)
-    # print(clusters)
+    cluster = clusters[0][1]
+    #print(cluster)
+    P, labels = load_data_from_csv_labeled(data_path)
+    nearest_idx = find_nearest_points_kd(P, cluster)
+    predict_labels = [labels[idx] for idx in nearest_idx]
+    #print(predict_labels)
+    counts = np.bincount(predict_labels)
+    label = np.argmax(counts)
+    if len(cluster) < 50:
+        extended_array = predict_labels + [0] * (50 - len(predict_labels))
+        predict_labels = np.array(extended_array)
 
+    TP = np.count_nonzero(predict_labels == label)
+    FP = len(cluster) - counts[-1]
+    # print(predict_labels)
+    # print(counts[-1])
+
+    TN = 0
+    FN = 50 - counts[-1]
+
+    accuracy = (TP + TN) / (TP + FP + TN + FN)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1 = TP / (TP + 1 / 2 * (FP + FN))
+    print("{:.3f}".format(accuracy))
+    print("{:.3f}".format(precision))
+    print("{:.3f}".format(recall))
+    print("{:.3f}".format(f1))
+    print('---------------------')
 
 if __name__ == "__main__":
     q = np.array([0.19, 0.92])
     #q = np.random.rand(2)
     #print(q)
-    base_path = '/Users/linus/Desktop/data/'
+    base_path = '/Users/linustse/Desktop/data/'
 
+
+    variants = [
+        '1', '5', '10', '15', '20'
+    ]
+    file_names = [f"UN_{variant}0K.csv" for variant in variants]
+
+    '''variants = [
+        '1', '5', '10', '15', '20'
+    ]
+    file_names = [f"RN_{variant}0K_50P_1S.csv" for variant in variants]'''
     variants = [
         '0.0S', '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S', '2.5S', '3.0S'
     ]
 
     file_names = [f"RN_{variant}_100K_50P.csv" for variant in variants]
-    '''variants = [
-        '1', '5', '10', '15', '20'
-    ]
-    file_names = [f"UN_{variant}0K.csv" for variant in variants]'''
-
+    base_path = '/Users/linustse/Desktop/data/labeled/rn/'
     variants = [
-        '1', '5', '10', '15', '20'
+        '0.0S', '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S'
     ]
-    file_names = [f"RN_{variant}0K_50P_1S.csv" for variant in variants]
+
+    file_names = [f"RN_100K_50P_{variant}.csv" for variant in variants]
+
+
     data_paths = [os.path.join(base_path, file_name) for file_name in file_names]
-    '''data_paths = ['/Users/linus/Desktop/data/labeled/rn/RN_100K_50P_0.0S.csv']
-    data_paths = ['/Users/linus/Desktop/data/UN_10K.csv']
-    data_paths = ['/Users/shirley/Desktop/data/RN_1.0S_100K_50P.csv']'''
+    #data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.0S.csv']
+
 
     for data_path in data_paths:
         run(data_path, q)

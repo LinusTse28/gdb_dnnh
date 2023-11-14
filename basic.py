@@ -32,15 +32,40 @@ def visualize_results(data, query_point, labels, closest_cluster, data_path):
     plt.show()
 
 def run(path, q):
-    P = np.array(pd.read_csv(path))
+    P, labels = load_data_from_csv_labeled(data_path)
     eps = auto_epsilon(P)
-    #eps =0.01093
-    #print(eps)
-
     startTime = time.time()
     closest_cluster, labels = find_closest_cluster(P, q, epsilon=eps)
     print(time.time() - startTime)
     visualize_results(P, q, labels, closest_cluster, path)
+    cluster = closest_cluster
+    nearest_idx = find_nearest_points_kd(P, cluster)
+    predict_labels = [labels[idx] for idx in nearest_idx]
+    # print(predict_labels)
+    counts = np.bincount(predict_labels)
+    label = np.argmax(counts)
+    if len(cluster) < 50:
+        extended_array = predict_labels + [0] * (50 - len(predict_labels))
+        predict_labels = np.array(extended_array)
+
+    TP = np.count_nonzero(predict_labels == label)
+    FP = len(cluster) - counts[-1]
+    # print(predict_labels)
+    # print(counts[-1])
+
+    TN = 0
+    FN = 50 - counts[-1]
+
+    accuracy = (TP + TN) / (TP + FP + TN + FN)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1 = TP / (TP + 1 / 2 * (FP + FN))
+    print("{:.3f}".format(accuracy))
+    print("{:.3f}".format(precision))
+    print("{:.3f}".format(recall))
+    print("{:.3f}".format(f1))
+    print('---------------------')
+
     #print(len(closest_cluster))
 # 测试代码
 if __name__ == "__main__":
@@ -50,17 +75,28 @@ if __name__ == "__main__":
     q = np.array([0.19, 0.92])
     #q = np.random.rand(2)
     #print(q)
-    base_path = '/Users/linus/Desktop/data/'
+    base_path = '/Users/linustse/Desktop/data/'
 
-    '''variants = [
-        '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S', '2.5S', '3.0S'
-    ]
 
-    file_names = [f"RN_{variant}_100K_50P.csv" for variant in variants]'''
     variants = [
         '1', '5', '10', '15', '20'
     ]
     file_names = [f"RN_{variant}0K_50P_1S.csv" for variant in variants]
+    variants = [
+        '1', '5', '10', '15', '20'
+    ]
+    file_names = [f"UN_{variant}0K.csv" for variant in variants]
+    variants = [
+        '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S', '2.5S', '3.0S'
+    ]
+
+    file_names = [f"RN_{variant}_100K_50P.csv" for variant in variants]
+    base_path = '/Users/linustse/Desktop/data/labeled/rn/'
+    variants = [
+          '0.0S', '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S'
+    ]
+
+    file_names = [f"RN_100K_50P_{variant}.csv" for variant in variants]
     data_paths = [os.path.join(base_path, file_name) for file_name in file_names]
     for data_path in data_paths:
         run(data_path, q)

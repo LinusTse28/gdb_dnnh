@@ -1,34 +1,46 @@
-from auto_epsilon import auto_epsilon
-import matplotlib.pyplot as plt
-import numpy as np
+from auto_epsilon import *
 import pandas as pd
+import numpy as np
 from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
-data_path = '/Users/linus/Desktop/data/labeled/rn/RN_100K_50P_0.0S.csv'
+def load_data_from_csv(file_path):
+    return np.array(pd.read_csv(file_path))
 
-'''X = np.array(pd.read_csv(data_path))
-X_scale = StandardScaler().fit_transform(X)
-# 使用DBSCAN进行聚类
-epsilon =auto_epsilon(X_scale)
-print(epsilon)
-db = DBSCAN(eps=0.04, min_samples=5)
-labels = db.fit_predict(X_scale)
+data_paths = ['/Users/linustse/Desktop/data/RN_50K_50P_1S.csv']
 
-# 可视化结果
-plt.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis', s=1)
-plt.title('DBSCAN clustering')
-plt.colorbar()
-plt.show()
-'''
-data = pd.read_csv(data_path)
-X = data.iloc[:, :2].values
-y = data.iloc[:, 2].values
+for data_path in data_paths:
+    X = load_data_from_csv(data_path)
+    eps = auto_epsilon(X)
+    print(eps)
 
-# 可视化
-plt.scatter(X[:, 0], X[:, 1], c=y, cmap='viridis', s=1)
-plt.xlabel('Feature 1')
-plt.ylabel('Feature 2')
-plt.colorbar()
-plt.title('Visualization of Labeled Data')
-plt.show()
+    minPts = 5
+    X = StandardScaler().fit_transform(X)
+    db = DBSCAN(eps=eps, min_samples=5)
+
+    # 执行DBSCAN聚类算法
+    y_db = db.fit_predict(X)
+
+    n_clusters_ = len(set(y_db)) - (1 if -1 in y_db else 0)
+    n_noise_ = list(y_db).count(-1)
+
+    print('Estimated number of clusters: %d' % n_clusters_)
+    print('Estimated number of noise points: %d' % n_noise_)
+
+    # 可视化聚类结果
+    # 给不同的簇分配不同的颜色
+    unique_labels = set(y_db)
+    colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]
+
+    for k, col in zip(unique_labels, colors):
+        if k == -1:
+            # Black used for noise.
+            col = [0, 0, 0, 1]
+
+        class_member_mask = (y_db == k)
+
+        xy = X[class_member_mask]
+        plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=tuple(col), markeredgecolor='k', markersize=1)
+
+    plt.title('Estimated number of clusters: %d' % n_clusters_)
+    plt.show()
