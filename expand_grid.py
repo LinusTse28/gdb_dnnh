@@ -77,7 +77,7 @@ def perform_clustering(data, q, minPts, eps, cell_size):
     spiral_idxs = spiral_cells(qx, qy, layers, grid_shape, cell_size)
 
     cells_to_eps = [spiral_idxs[i] for i in range(10)]
-    pts_to_eps = get_pts_in_layers(grid, spiral_idxs, layer=2)
+    pts_to_eps = get_pts_in_layers(grid, spiral_idxs, layer=3)
     #print(pts_to_eps)
     grid_eps = auto_epsilon(pts_to_eps, minPts=minPts)
     #print(grid_eps)
