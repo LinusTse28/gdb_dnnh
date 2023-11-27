@@ -8,22 +8,12 @@ from matplotlib.patches import Rectangle
 import os
 import time
 from sklearn.metrics import precision_recall_fscore_support
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, classification_report
-from tabulate import tabulate
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 
 def load_data_from_csv(file_path):
     return np.array(pd.read_csv(file_path))
 
-
-def load_data_from_csv_labeled(file_path):
-    # 加载数据，假设CSV文件的前两列是x和y坐标，第三列是标签
-    df = pd.read_csv(file_path)
-
-    # 分离特征和标签
-    X = df.iloc[:, :2].values  # 前两列是特征
-    y = df.iloc[:, 2].values  # 第三列是标签
-
-    return X, y
 def set_grid(data, cell_size):
     # 确定网格大小
     grid_shape = (int(np.ceil(1 / cell_size)), int(np.ceil(1 / cell_size)))
@@ -38,67 +28,22 @@ def set_grid(data, cell_size):
 def get_grid_index(x, cell_size):
     return int(x // cell_size)
 
-'''def spiral_cells(qx, qy, layers, grid_shape, cell_size):
-    cells = []
-    x, y = get_grid_index(qx, cell_size), get_grid_index(qy, cell_size)
-    x_offset = qx % cell_size - 0.5 * cell_size
-    y_offset = qy % cell_size - 0.5 * cell_size
-
-    for layer in range(layers):
-        # Right
-        for i in range(2 * layer + 1):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            x += 1
-            if layer == 0 and i == 0:
-                x += get_grid_index(x_offset, cell_size)
-        # Up
-        for i in range(2 * layer + 1):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            y -= 1
-            if layer == 0 and i == 0:
-                y -= get_grid_index(y_offset, cell_size)
-        # Left
-        for i in range(2 * layer + 2):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            x -= 1
-        # Down
-        for i in range(2 * layer + 2):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            y += 1
-    return cells'''
-
-
 def spiral_cells(qx, qy, layers, grid_shape, cell_size):
     cells = []
-    # 将查询点转换为网格索引
     x, y = get_grid_index(qx, cell_size), get_grid_index(qy, cell_size)
-
-    # 从查询点所在单元格开始
     cells.append((y, x))
 
-    # 定义移动方向 (右, 上, 左, 下)
     directions = [(0, 1), (-1, 0), (0, -1), (1, 0)]
-
-    # 定义初始步数
     steps = 1
 
-    # 开始生成螺旋路径
     for layer in range(1, layers):
-        # 遍历每个方向
         for dx, dy in directions:
-            # 对于每个方向，根据当前层进行适当次数的移动
             for _ in range(steps):
                 x += dx
                 y += dy
-                # 检查坐标是否在网格内
                 if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
                     cells.append((y, x))
-            # 每完成一个方向，增加步数
-            if dx == 1 or dx == -1:  # 在水平移动之后增加步数
+            if dx == 1 or dx == -1:
                 steps += 1
 
     return cells
@@ -191,23 +136,6 @@ def is_layer_end_cell(idx):
     layer = calculate_layer(idx)
     return idx == (2*layer+1)**2 - 1
 
-
-'''def is_mergeable(new_points, existing_cluster, eps, minPts):
-    nn = NearestNeighbors(radius=eps)
-
-    # 将新点和现有聚类中的点结合起来
-    all_points = np.vstack((new_points, existing_cluster))
-
-    # 训练最近邻模型
-    nn.fit(all_points)
-
-    # 对每个新点进行半径查询
-    for point in new_points:
-        # 如果新点在eps半径内有足够多的邻居，则认为是可合并的
-        if len(nn.radius_neighbors([point], return_distance=False)[0]) >= minPts:
-            return True
-
-    return False'''
 def is_mergeable(new_points, existing_cluster):
     # 对于 new_points 中的每个点
     for point in new_points:
@@ -216,7 +144,18 @@ def is_mergeable(new_points, existing_cluster):
             return True
     return False
 
-def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_shape):
+def perform_clustering(data, q, minPts, eps, cell_size):
+
+    layers = int(round(1 / cell_size) / 2) + 1
+    grid, grid_shape = set_grid(data, cell_size)
+
+    spiral_idxs = spiral_cells(qx, qy, layers, grid_shape, cell_size)
+
+    cells_to_eps = [spiral_idxs[i] for i in range(10)]
+    pts_to_eps = get_pts_in_cells(grid, cells_to_eps)
+    print(pts_to_eps)
+    grid_eps = auto_epsilon(pts_to_eps, minPts=minPts)
+    print(grid_eps)
     cluster_dict = {}
     clusterID = 0
 
@@ -228,17 +167,16 @@ def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_
         layer = calculate_layer(idx)  # 用于确定当前索引所在的层级
         cells = get_cells(idx)
         pts_in_cells = get_pts_in_cells(grid, cells)
-
         #print('idx: ', idx, 'cells: ', cells, 'len(pts): ', len(pts_in_cells))
         if len(pts_in_cells) >= minPts:
-            db = DBSCAN(eps=eps, min_samples=minPts).fit(pts_in_cells)
+            pts_scale = StandardScaler().fit_transform(pts_in_cells)
+            db = DBSCAN(eps=grid_eps, min_samples=minPts).fit(pts_scale)
             for label in set(db.labels_):
                 if label == -1:
                     continue  # 忽略噪声点
                 class_member_mask = (db.labels_ == label)
                 new_points = pts_in_cells[class_member_mask]
 
-                # 尝试将新点合并到现有的聚类中，或者创建一个新聚类
                 merged = False
                 for cluster_id, existing_cluster in cluster_dict.items():
                     if is_mergeable(new_points, existing_cluster):
@@ -255,18 +193,13 @@ def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_
             continue
 
         idx += 1
-
+    print(' final idx: ', idx)
     delta_values = {cluster_id: delta(q, cluster) for cluster_id, cluster in cluster_dict.items()}
     min_delta_cluster_id = min(delta_values, key=delta_values.get)
 
     return cluster_dict[min_delta_cluster_id], min_delta_cluster_id
 
-def evaluate_clustering(labels_true, labels_pred):
-
-    precision, recall, f1, _ = precision_recall_fscore_support(labels_true, labels_pred, average='weighted')
-    return precision, recall, f1
-
-def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, grid_shape):
+def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, x0_range, x1_range):
     fig, ax = plt.subplots(figsize=(8, 8))
 
     # 绘制查询点
@@ -292,21 +225,12 @@ def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, gr
                      linewidth=1, edgecolor='red', facecolor='none')
     ax.add_patch(rect)
 
-    '''# 标记格子的顺序
-    for i, (y, x) in enumerate(spiral_idxs):
-        # 计算格子中心点坐标
-        center_x, center_y = (x * cell_size + cell_size / 2), (y * cell_size + cell_size / 2)
-        # 如果该格子在目标聚类中，添加注释
-        if any(np.all(min_delta_cluster == point, axis=1) for point in grid[y][x]):
-            ax.text(center_x, center_y, str(i), color="black", ha="center", va="center", fontsize=8)'''
-
-    # 设置图例和坐标轴标签
     ax.legend()
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
 
-    ax.set_xlim(0.15, 0.25)
-    ax.set_ylim(0.85, 0.95)
+    ax.set_xlim(x0_range)
+    ax.set_ylim(x1_range)
 
     plt.gca().set_aspect('equal', adjustable='box')
     plt.show()
@@ -329,87 +253,42 @@ variants = [
     ]
 file_names = [f"UN_{variant}0K.csv" for variant in variants]
 
+
 variants = [
         '0.0S', '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S', '2.5S', '3.0S'
     ]
 
 file_names = [f"RN_{variant}_100K_50P.csv" for variant in variants]
-
-#data_paths = ['/Users/linustse/Desktop/data/RN_200K_50P_1S.csv']
-base_path = '/Users/linustse/Desktop/data/labeled/rn/'
-variants = [
-    '0.0S', '0.1S', '0.2S', '0.3S', '0.4S', '0.5S', '1.0S', '1.5S', '2.0S'
-]
-
-file_names = [f"RN_100K_50P_{variant}.csv" for variant in variants]
-
 data_paths = [os.path.join(base_path, file_name) for file_name in file_names]
-
-#data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_1.0S.csv']
+#data_paths = ['/Users/linustse/Desktop/data/RN_200K_50P_1S.csv']
+data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.1S.csv']
 for data_path in data_paths:
     #data = load_data_from_csv(data_path)
     data, labels = load_data_from_csv_labeled(data_path)
     #print('data\n', data)
     eps = auto_epsilon(data)
+    print(eps)
     minPts = 5
-    q = np.array([0.19, 0.92])
-
+    #q = np.array([0.19, 0.92])
+    q = np.array([0.21808777, 0.72194386])
+    x0_range = (q[0] - 0.1, q[0] + 0.1)  # 假设范围为点的横坐标减小0.1到加大0.1
+    x1_range = (q[1] - 0.1, q[1] + 0.1)
+    print(q)
     cell_size = eps / sqrt(2)
     #print(cell_size)
     #grid_shape = (round(1 / cell_size), round(1 / cell_size))
     layers = int(round(1 / cell_size) / 2) + 1
     grid, grid_shape = set_grid(data, cell_size)
+    print('len(grid): ', len(grid))
     qx, qy = q[0], q[1]
     q_idx = (int(q[0] / cell_size), int(q[1] / cell_size))
     #print(qx//cell_size, qy//cell_size)
     spiral_idxs = spiral_cells(qx, qy, layers, grid_shape, cell_size)
     #print(spiral_idxs[:10])
     start_time = time.time()
-    cluster, cluster_id = perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_shape)
-    print(time.time() - start_time)
-    cluster = np.unique(cluster, axis=0)
-    nearest_idx = find_nearest_points_kd(data, cluster)
-    predict_labels = [labels[idx] for idx in nearest_idx]
+    cluster, cluster_id = perform_clustering(data, q, minPts, eps, cell_size)
+   # print(cluster)
+    print(time.time()-start_time)
 
-    counts = np.bincount(predict_labels)
-    label = np.argmax(counts)
-    if len(cluster) < 50:
-        extended_array = predict_labels + [0] * (50 - len(predict_labels))
-        predict_labels = np.array(extended_array)
-
-    TP = np.count_nonzero(predict_labels == label)
-    FP = len(cluster)-counts[-1]
-    #print(predict_labels)
-    #print(counts[-1])
-
-    TN = 0
-    FN = 50 - counts[-1]
-
-    accuracy = (TP + TN) / (TP + FP + TN + FN)
-    precision = TP / (TP + FP)
-    recall = TP / (TP + FN)
-    f1 = TP / (TP + 1 / 2 * (FP + FN))
-    print("Accuracy:", accuracy)
-    print("Precision:", precision)
-    print("Recall:", recall)
-    print("F1:", f1)
-    #print('nearest_points_indices:', predict_labels)
-    '''real_labels = np.array([label] * 50)
-    #print(real_labels)
-    accuracy = accuracy_score(real_labels, predict_labels)
-
-    confusion = confusion_matrix(real_labels, predict_labels)
-
-    precision = precision_score(real_labels, predict_labels, average='weighted')
-
-    recall = recall_score(real_labels, predict_labels, average='weighted')
-
-    f1 = f1_score(real_labels, predict_labels, average='weighted')
-
-    report = classification_report(real_labels, predict_labels)
-    print("分类报告:")
-    print(report)'''
-
-
-    visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, grid_shape)
+    visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, x0_range, x1_range)
 

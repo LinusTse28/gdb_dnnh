@@ -33,11 +33,11 @@ def auto_epsilon(P, minPts=5):
                       interp_method='polynomial')  # interp_method='polynomial'
     ''''/Users/shirley/Desktop/data/RN_1.0S_100K_50P.csv'''
 
-    distancia = round(distances_last[kn.knee], 5)
-    epsilon = round(distances_last[kn2.knee], 5)
+    distancia = round(distances_last[kn.knee], 7)
+    epsilon = round(distances_last[kn2.knee], 7)
     #print('eps1: ', distancia, ', eps2: ', epsilon)
 
-    return distancia
+    return epsilon
 
 def eps_time(path):
 

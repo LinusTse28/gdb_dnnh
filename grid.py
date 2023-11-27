@@ -13,8 +13,6 @@ from sklearn.preprocessing import StandardScaler
 def load_data_from_csv(file_path):
     return np.array(pd.read_csv(file_path))
 
-
-
 def set_grid(data, cell_size):
     # 确定网格大小
     grid_shape = (int(np.ceil(1 / cell_size)), int(np.ceil(1 / cell_size)))
@@ -29,67 +27,22 @@ def set_grid(data, cell_size):
 def get_grid_index(x, cell_size):
     return int(x // cell_size)
 
-'''def spiral_cells(qx, qy, layers, grid_shape, cell_size):
-    cells = []
-    x, y = get_grid_index(qx, cell_size), get_grid_index(qy, cell_size)
-    x_offset = qx % cell_size - 0.5 * cell_size
-    y_offset = qy % cell_size - 0.5 * cell_size
-
-    for layer in range(layers):
-        # Right
-        for i in range(2 * layer + 1):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            x += 1
-            if layer == 0 and i == 0:
-                x += get_grid_index(x_offset, cell_size)
-        # Up
-        for i in range(2 * layer + 1):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            y -= 1
-            if layer == 0 and i == 0:
-                y -= get_grid_index(y_offset, cell_size)
-        # Left
-        for i in range(2 * layer + 2):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            x -= 1
-        # Down
-        for i in range(2 * layer + 2):
-            if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
-                cells.append((y, x))
-            y += 1
-    return cells'''
-
-
 def spiral_cells(qx, qy, layers, grid_shape, cell_size):
     cells = []
-    # 将查询点转换为网格索引
     x, y = get_grid_index(qx, cell_size), get_grid_index(qy, cell_size)
-
-    # 从查询点所在单元格开始
     cells.append((y, x))
 
-    # 定义移动方向 (右, 上, 左, 下)
     directions = [(0, 1), (-1, 0), (0, -1), (1, 0)]
-
-    # 定义初始步数
     steps = 1
 
-    # 开始生成螺旋路径
     for layer in range(1, layers):
-        # 遍历每个方向
         for dx, dy in directions:
-            # 对于每个方向，根据当前层进行适当次数的移动
             for _ in range(steps):
                 x += dx
                 y += dy
-                # 检查坐标是否在网格内
                 if 0 <= x < grid_shape[1] and 0 <= y < grid_shape[0]:
                     cells.append((y, x))
-            # 每完成一个方向，增加步数
-            if dx == 1 or dx == -1:  # 在水平移动之后增加步数
+            if dx == 1 or dx == -1:
                 steps += 1
 
     return cells
@@ -182,23 +135,6 @@ def is_layer_end_cell(idx):
     layer = calculate_layer(idx)
     return idx == (2*layer+1)**2 - 1
 
-
-'''def is_mergeable(new_points, existing_cluster, eps, minPts):
-    nn = NearestNeighbors(radius=eps)
-
-    # 将新点和现有聚类中的点结合起来
-    all_points = np.vstack((new_points, existing_cluster))
-
-    # 训练最近邻模型
-    nn.fit(all_points)
-
-    # 对每个新点进行半径查询
-    for point in new_points:
-        # 如果新点在eps半径内有足够多的邻居，则认为是可合并的
-        if len(nn.radius_neighbors([point], return_distance=False)[0]) >= minPts:
-            return True
-
-    return False'''
 def is_mergeable(new_points, existing_cluster):
     # 对于 new_points 中的每个点
     for point in new_points:
@@ -207,7 +143,13 @@ def is_mergeable(new_points, existing_cluster):
             return True
     return False
 
-def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_shape):
+def perform_clustering(data, q, minPts, eps):
+
+    cell_size = eps / sqrt(2)
+    layers = int(round(1 / cell_size) / 2) + 1
+    grid, grid_shape = set_grid(data, cell_size)
+
+    spiral_idxs = spiral_cells(qx, qy, layers, grid_shape, cell_size)
     cluster_dict = {}
     clusterID = 0
 
@@ -219,7 +161,6 @@ def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_
         layer = calculate_layer(idx)  # 用于确定当前索引所在的层级
         cells = get_cells(idx)
         pts_in_cells = get_pts_in_cells(grid, cells)
-
         #print('idx: ', idx, 'cells: ', cells, 'len(pts): ', len(pts_in_cells))
         if len(pts_in_cells) >= minPts:
             db = DBSCAN(eps=eps, min_samples=minPts).fit(pts_in_cells)
@@ -252,7 +193,7 @@ def perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_
 
     return cluster_dict[min_delta_cluster_id], min_delta_cluster_id
 
-def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, grid_shape):
+def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, x0_range, x1_range):
     fig, ax = plt.subplots(figsize=(8, 8))
 
     # 绘制查询点
@@ -278,21 +219,12 @@ def visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, gr
                      linewidth=1, edgecolor='red', facecolor='none')
     ax.add_patch(rect)
 
-    '''# 标记格子的顺序
-    for i, (y, x) in enumerate(spiral_idxs):
-        # 计算格子中心点坐标
-        center_x, center_y = (x * cell_size + cell_size / 2), (y * cell_size + cell_size / 2)
-        # 如果该格子在目标聚类中，添加注释
-        if any(np.all(min_delta_cluster == point, axis=1) for point in grid[y][x]):
-            ax.text(center_x, center_y, str(i), color="black", ha="center", va="center", fontsize=8)'''
-
-    # 设置图例和坐标轴标签
     ax.legend()
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
 
-    ax.set_xlim(0.15, 0.25)
-    ax.set_ylim(0.85, 0.95)
+    ax.set_xlim(x0_range)
+    ax.set_ylim(x1_range)
 
     plt.gca().set_aspect('equal', adjustable='box')
     plt.show()
@@ -327,11 +259,15 @@ data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.1S.csv']
 for data_path in data_paths:
     #data = load_data_from_csv(data_path)
     data, labels = load_data_from_csv_labeled(data_path)
-    print('data\n', data)
+    #print('data\n', data)
     eps = auto_epsilon(data)
+    print(eps)
     minPts = 5
-    q = np.array([0.19, 0.92])
-
+    #q = np.array([0.19, 0.92])
+    q = np.random.rand(2)
+    x0_range = (q[0] - 0.1, q[0] + 0.1)  # 假设范围为点的横坐标减小0.1到加大0.1
+    x1_range = (q[1] - 0.1, q[1] + 0.1)
+    print(q)
     cell_size = eps / sqrt(2)
     #print(cell_size)
     #grid_shape = (round(1 / cell_size), round(1 / cell_size))
@@ -343,9 +279,9 @@ for data_path in data_paths:
     spiral_idxs = spiral_cells(qx, qy, layers, grid_shape, cell_size)
     #print(spiral_idxs[:10])
     start_time = time.time()
-    cluster, cluster_id = perform_clustering(data, q, minPts, cell_size, eps, spiral_idxs, grid, grid_shape)
-    print('cluster\n', cluster)
+    cluster, cluster_id = perform_clustering(data, q, minPts, eps)
+    print(cluster)
     print(time.time()-start_time)
 
-    visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, grid, grid_shape)
+    visualization(data, q, cluster, cluster_id, cell_size, spiral_idxs, x0_range, x1_range)
 

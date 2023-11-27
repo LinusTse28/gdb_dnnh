@@ -8,7 +8,7 @@ def find_closest_cluster(data, query_point, epsilon, minPts):
     labels = db.labels_
     clusters = [data[labels == i] for i in range(max(labels) + 1) if np.sum(labels == i) >= (3 * minPts)]
     closest_cluster = None
-
+    print('nums of clusters: ', len(clusters))
     if len(clusters) > 0:
         #print('len(clusters): ', len(clusters))
         delta_values = [delta_(query_point, cluster) for cluster in clusters]
@@ -33,7 +33,7 @@ def visualize_results(data, query_point, labels, closest_cluster, data_path, x0_
 
     plt.show()
 
-def run(data_path):
+def run(path):
     q = np.random.rand(2)
     # print(q)
     x0_range = (q[0] - 0.1, q[0] + 0.1)
@@ -41,11 +41,11 @@ def run(data_path):
     P, labels = load_data_from_csv_labeled(data_path)
     minPts = 4
     eps = auto_epsilon(P, minPts)
-    #print(eps)
+    print(eps)
     startTime = time.time()
     closest_cluster, labels = find_closest_cluster(P, q, epsilon=eps, minPts=minPts)
     execution_time = time.time() - startTime
-    #visualize_results(P, q, labels, closest_cluster, path, x0_range, x1_range)
+    visualize_results(P, q, labels, closest_cluster, path, x0_range, x1_range)
     cluster = closest_cluster
     nearest_idx = find_nearest_points_kd(P, cluster)
     predict_labels = [labels[idx] for idx in nearest_idx]
@@ -102,19 +102,19 @@ if __name__ == "__main__":
     file_names = [f"RN_100K_50P_{variant}.csv" for variant in variants]
     data_paths = [os.path.join(base_path, file_name) for file_name in file_names]
     all_results = []
+    data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.1S.csv']
 
     for data_path in data_paths:
         experiment_results = []
-        for i in range(30):
+        for i in range(1):
             result = run(data_path)
-            result['data_path'] = data_path
+            '''result['data_path'] = data_path
             experiment_results.append(result)
 
         all_results.extend(experiment_results)
 
     df_results = pd.DataFrame(all_results)
     df_results.to_excel('/Users/linustse/Desktop/experiment_results.xlsx', index=False)
+'''
 
-    '''closest_cluster, labels = find_closest_cluster(data, q)
-    visualize_results(data, q, labels, closest_cluster)'''
 

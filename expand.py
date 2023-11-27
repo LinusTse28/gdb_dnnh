@@ -151,7 +151,7 @@ def expand_algorithm(P, q, epsilon, minPts=5):
     return clusters, labels, bound
 
 
-def plot_clusters(data, clusters, labels, q, bound, data_path):
+def plot_clusters(data, clusters, labels, q, bound, data_path, x0_range, x1_range):
     plt.figure()
     # Create colormap
     cmap = cm.get_cmap('rainbow', len(clusters))
@@ -182,8 +182,8 @@ def plot_clusters(data, clusters, labels, q, bound, data_path):
     plt.xlabel("x")
     plt.ylabel("y")
 
-    plt.xlim(0.1, 0.3)
-    plt.ylim(0.8, 1)
+    plt.xlim(x0_range)
+    plt.ylim(x1_range)
 
     plt.show()
 
@@ -212,30 +212,30 @@ def plot_current_cluster(data, labels, clusterId, q, bound):
     plt.title(f"Cluster {clusterId}")
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.xlim(0.1, 0.3)
-    plt.ylim(0.8, 1)
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
     plt.show()
 
 
-def run(path, q):
-    P, labels = load_data_from_csv_labeled(data_path)
-    #P = np.array(pd.read_csv(path))
+def run(path):
+    q = np.random.rand(2)
+    x0_range = (q[0] - 0.1, q[0] + 0.1)  # 假设范围为点的横坐标减小0.1到加大0.1
+    x1_range = (q[1] - 0.1, q[1] + 0.1)
+    P, real_labels = load_data_from_csv_labeled(data_path)
+    P_save = P
     P = np.array(sorted(P, key=lambda p: np.linalg.norm(p - q)))
-    #P = np.array([[p, idx] for idx, p in enumerate(P_sorted)], dtype=object)
 
     eps = auto_epsilon(P)
 
     startTime = time.time()
     clusters, labels, bound = expand_algorithm(P, q, epsilon=eps)
-    #print('processing time is ', time.time() - startTime)
-    #print(time.time() - startTime)
-    plot_clusters(P, clusters, labels, q, bound, path)
+    execution_time = time.time() - startTime
+    plot_clusters(P, clusters, labels, q, bound, path, x0_range, x1_range)
     cluster = clusters[0][1]
     #print(cluster)
-    P, labels = load_data_from_csv_labeled(data_path)
-    nearest_idx = find_nearest_points_kd(P, cluster)
-    predict_labels = [labels[idx] for idx in nearest_idx]
-    #print(predict_labels)
+
+    nearest_idx = find_nearest_points_kd(P_save, cluster)
+    predict_labels = [real_labels[idx] for idx in nearest_idx]
     counts = np.bincount(predict_labels)
     label = np.argmax(counts)
     if len(cluster) < 50:
@@ -248,21 +248,25 @@ def run(path, q):
     # print(counts[-1])
 
     TN = 0
-    FN = 50 - counts[-1]
+    FN = (lambda x: 50 if x >= 50 else 50 - x)(counts[-1])
 
     accuracy = (TP + TN) / (TP + FP + TN + FN)
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     f1 = TP / (TP + 1 / 2 * (FP + FN))
-    print("{:.3f}".format(accuracy))
-    print("{:.3f}".format(precision))
-    print("{:.3f}".format(recall))
-    print("{:.3f}".format(f1))
-    print('---------------------')
+
+    return {
+        "time": execution_time,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1
+    }
+
 
 if __name__ == "__main__":
-    q = np.array([0.19, 0.92])
-    #q = np.random.rand(2)
+    #q = np.array([0.19, 0.92])
+
     #print(q)
     base_path = '/Users/linustse/Desktop/data/'
 
@@ -290,10 +294,21 @@ if __name__ == "__main__":
 
 
     data_paths = [os.path.join(base_path, file_name) for file_name in file_names]
-    #data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.0S.csv']
+    data_paths = ['/Users/linustse/Desktop/data/labeled/rn/RN_100K_50P_0.2S.csv']
 
+    all_results = []
 
     for data_path in data_paths:
-        run(data_path, q)
+        experiment_results = []
+        for i in range(1):
+            result = run(data_path)
 
+            '''result['data_path'] = data_path
+            experiment_results.append(result)
+
+        all_results.extend(experiment_results)
+
+    df_results = pd.DataFrame(all_results)
+    df_results.to_excel('/Users/linustse/Desktop/experiment_results.xlsx', index=False)
+'''
 
